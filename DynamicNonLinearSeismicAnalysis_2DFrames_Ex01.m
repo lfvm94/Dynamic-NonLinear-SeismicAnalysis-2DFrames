@@ -271,6 +271,9 @@ plastbars=zeros(2,nbars);
 dofhist=[16 19 22]; % dof to evaluate
 
 % Non-Linear Newmark-Beta
+qbarxy=zeros(nbars,2); % The distributed loads are not considered
+                       % given that they have already being taken on 
+                       % account for the computation of the mass matrix
 [Dsnap,D,V,A]=NewmarkBetaNonLinearMDOF2(Kgl,Cgl,Mgl,d0,v0,dt,beta,gamma,...
  t,f,dofhist,bc,AlfaBeta,qbarxy,A,Mp,E,I,coordxy,ni,nf,support,mpbar,...
  plastbars);

@@ -1,10 +1,11 @@
-function [barPlasNode,Kfglobal,support,plastbars,mpbar]=Pushover2DFrames...
-     (qbary,A,Mp,E,I,coordxy,ni,nf,bc,seismicforces,dofForces,support,...
-      mpbar,plastbars)
+function [barPlasNode,Kfglobal,support,plastbars,mpbar,fglobal]=...
+    Pushover2DFrames(qbary,A,Mp,E,I,coordxy,ni,nf,bc,seismicforces,...
+    dofForces,support,mpbar,plastbars)
 
 %------------------------------------------------------------------------
-% [barPlasNode,Kfglobal]=Pushover2DFrames(qbary,A,Mp,E,I,coordxy,...
-%  ni,nf,support,bc,seismicforces,dofForces,support)
+% [barPlasNode,Kfglobal,support,plastbars,mpbar,fglobal]=...
+%  Pushover2DFrames(qbary,A,Mp,E,I,coordxy,ni,nf,bc,seismicforces,...
+%  dofForces,support,mpbar,plastbars)
 %
 %------------------------------------------------------------------------
 % PURPOSE
@@ -49,23 +50,34 @@ function [barPlasNode,Kfglobal,support,plastbars,mpbar]=Pushover2DFrames...
 %         dofForces = [dof-f(1),     dof at which the lateral forces are
 %                       dof-f(n)]    applied (from bottom to top) - global
 %
-% OUTPUT: historyIncLoad             history of incremental load factors at
-%                                    at which plastic moments are reached
+% OUTPUT: barPlasNode:               vector indicating the plastic
+%                                    formations at each element's end at 
+%                                    current run:
+%                                    1 -> a plastic formation on the
+%                                         element's left end
+%                                    2 -> a plastic formation on the
+%                                         element's right end
+%                                    3 -> a plastic formation at each
+%                                         element's end
 %
-%         pdriftDI                   Plastic inter-story drift Damage 
-%                                    Index per floor: size = [nfloors,1]
+%         Kfglobal:                  modified stiffness matrix
 %
-%         driftDI                    Inter-story drift Damage 
-%                                    Index per floor: size = [nfloors,1]
+%         support:                   array indicating the elements' ends 
+%                                    conditions
 %
-%         defBasedDI                 Deformation based Damage Index
-%                                    per floor size = [nfloors,1]
+%         plastbars:                 array indicating the plastic formation 
+%                                    history for each element
 %
-%         maxDisplacement            Max absoloute lateral displacement
-%                                    for each floor: size = [nfloors,1]
+%         mpbar:                     plastic bending moment caused at the 
+%                                    elements' end(s)
+%
+%         fglobal:                   modified global force vector
+%                                    (considering both the seismic inertial
+%                                    forces and the internal element
+%                                    forces)
 % 
 %------------------------------------------------------------------------
-% LAST MODIFIED: L.F.Veduzco    2022-01-18
+% LAST MODIFIED: L.F.Veduzco    2023-06-13
 %                Faculty of Engineering
 %                Autonomous University of Queretaro
 %------------------------------------------------------------------------
@@ -142,7 +154,7 @@ for an=1:2
         % Solving the system of equations
         [Uglobal,Reactions]=solveq(Kglobal,fglobal,bc);
 
-        % --- computation of mechanic elements at the ends of bars --- %
+        % Computation of mechanic elements at the ends of bars
         Ed=extract(Edof,Uglobal);
         for i=1:nbars
 
@@ -160,9 +172,9 @@ for an=1:2
         current_plas=0; % to register if there is a plastification in the 
                         % current run
 
-        plastified_bars=zeros(nbars,1); % to register which bars are plastified
-                                        % in the current run (if any)
-
+        plastified_bars=zeros(nbars,1); % to register which bars underwent
+                                        % a plastic hinge formation(s) in 
+                                        % the current run (if any)
         for i=1:nbars
 
             % Detect if any end of this bar (i) has been plastified
@@ -174,10 +186,12 @@ for an=1:2
             if bar_plas_check==1
                 % Detect if the other end has been also plastified
                 if abs(reac_bars(3,i))>=Mp(i,1) && ...
-                   abs(reac_bars(6,i))>=Mp(i,2) % if both ends are plastified
+                   abs(reac_bars(6,i))>=Mp(i,2) % if both ends underwent 
+                                                % plastic hinge formations
 
                     if plastbars(1,i)==1 && plastbars(2,i)==0 
-                        % The bar is currently Art-Fixed and will be Art-Art
+                        % The element is currently Art-Fixed and 
+                        % will be Art-Art
                         current_plas=1;
 
                         plastbars(2,i)=1;
@@ -192,7 +206,8 @@ for an=1:2
                         plastified_bars(i,1)=2;
 
                     elseif plastbars(1,i)==0 && plastbars(2,i)==1
-                        % The bar is currently Fixed-Art and will be Art-Art
+                        % The element is currently Fixed-Art and 
+                        % will be Art-Art
                         current_plas=1;
                         plastbars(1,i)=1;
 

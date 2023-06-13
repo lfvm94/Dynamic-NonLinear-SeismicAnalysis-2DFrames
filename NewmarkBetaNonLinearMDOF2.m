@@ -1,9 +1,10 @@
 function [Dsnap,D,V,A]=NewmarkBetaNonLinearMDOF2(K,C,M,d0,v0,dt,beta,gamma,...
-          t,f,dofhist,bc,RayCoeff,qbary,Ae,Mp,Ee,Ie,coordxy,ni,nf,support,...
+          t,f,dofhist,bc,RayCoeff,qbarxy,Ae,Mp,Ee,Ie,coordxy,ni,nf,support,...
           mpbar,plastbars)
 % SYNTAX : 
 % [Dsnap,D,V,A]=NewmarkBetaNonLinearMDOF2(K,C,M,d0,v0,dt,beta,gamma,...
-%  t,f,dofhist,bc,RayCoeff,qbary,Ae,Mp,Ee,Ie,coordxy,ni,nf,support)
+%   t,f,dofhist,bc,RayCoeff,qbarxy,Ae,Mp,Ee,Ie,coordxy,ni,nf,support,...
+%   mpbar,plastbars)
 %---------------------------------------------------------------------
 %    PURPOSE
 %     To solve a dynamic system of 2nd order with the Non-Linear 
@@ -65,20 +66,27 @@ D(:,1) = d0(dofhist');  % Initial values of solution
 V(:,1) = v0(dofhist');   
 A(:,1) = a0(dofhist');
 
-Keff = M+b3*C+b4*K;         
+% Keff = M+b3*C+b4*K;         
 
 dnew=d0;    
 vnew=v0;    
 anew=a0; 
-
-maxForces=norm(f(:,1));
 for isnap = 1:nstep
     dpred=dnew+dt*vnew+b1*anew;     
     vpred=vnew+b2*anew;
-     
-    eff=f(:,isnap+1)-C*vpred-K*dpred;
+    
+    % Update stiffness matrix so that plastic hinge formations are 
+    % considered
+    [barPlasNode(:,isnap),K,support,plastbars,mpbar,f(:,isnap+1)]=...
+     Pushover2DFrames(qbarxy,Ae,Mp,Ee,Ie,coordxy,ni,nf,bc,f(:,isnap+1),...
+     [1:nd]',support,mpbar,plastbars);
+    
+    % Update Rayleigh Damping Matrix
+    C=r1*M+r2*K;
+    Keff = M+b3*C+b4*K;
     
     % Update a,v,d for the next iteration
+    eff=f(:,isnap+1)-C*vpred-K*dpred;
     anew=solveq(Keff,eff,bc); % -> This is a CALFEM function, to download
                               % CALFEM visit its repository at:
                               % https://github.com/CALFEM/calfem-matlab
@@ -92,19 +100,9 @@ for isnap = 1:nstep
 
     Dsnap(:,isnap) = dnew; % Time-History displacement for all DOF
     
-    % Update stiffness matrix
-    [barPlasNode,K,support,plastbars,mpbar]=Pushover2DFrames(qbary,...
-     Ae,Mp,Ee,Ie,coordxy,ni,nf,bc,f(:,isnap+1),[1:nd]',support,mpbar,...
-     plastbars);
-    
-    % Update Rayleigh Damping Matrix
-    C=r1*M+r2*K;
-    Keff = M+b3*C+b4*K;
-    
-    
 end
 D=D(:,2:nstep+1);
 V=V(:,2:nstep+1);
 A=A(:,2:nstep+1);
 
-%--------------------------End--------------------------------
+%--------------------------------End----------------------------------
